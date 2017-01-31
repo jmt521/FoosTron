@@ -1,4 +1,4 @@
-// #include "Arduino.h"
+#include "Arduino.h"
 
 #ifndef SingleSevSeg_h
 #define SingleSevSeg_h
