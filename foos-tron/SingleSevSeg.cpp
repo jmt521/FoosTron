@@ -12,18 +12,36 @@ SingleSevSeg::SingleSevSeg(bool _displayType, int* _pinLayout)
   }
 }
 
+void SingleSevSeg::winner()
+{
+  SingleSevSeg::display(0);
+  for(int j=0; j<4; j++)
+  {
+    for(int i=0; i<NUM_PINS-1; i++)
+    {
+      if(displayType == COMMON_CATHODE)
+      {
+        digitalWrite(pinLayout[i], 1);
+      } else {
+        digitalWrite(pinLayout[i], 0);
+      }
+      delay(100);
+      if(displayType == COMMON_CATHODE)
+      {
+        digitalWrite(pinLayout[i], 0);
+      } else {
+        digitalWrite(pinLayout[i], 1);
+      }
+    }
+  }
+}
+
 void SingleSevSeg::display(int digit)
 {
-  Serial.print("Printing ");
-  Serial.println(digit, DEC);
-
-  bool* segMap = SEGMENT_MAP[digit];
+  const bool* segMap = SEGMENT_MAP[digit];
 
   for(int i=0; i<NUM_PINS; i++)
   {
-   Serial.print(segMap[i], DEC);
-   Serial.print("|");
-
     if(displayType == COMMON_CATHODE)
     {
       digitalWrite(pinLayout[i], segMap[i]);
@@ -31,5 +49,4 @@ void SingleSevSeg::display(int digit)
       digitalWrite(pinLayout[i], !segMap[i]);
     }
   }
-  Serial.println(" ");
 }

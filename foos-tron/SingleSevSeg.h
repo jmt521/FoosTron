@@ -11,6 +11,7 @@ class SingleSevSeg
   public:
     SingleSevSeg(bool displayType, int* pinLayout);
     void display(int digit);
+    void winner();
 
   protected:
     bool displayType;
