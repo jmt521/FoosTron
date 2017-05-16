@@ -13,11 +13,18 @@ const int GOAL2_PIN = 3;
 const int BTN_COUNT = 4;
 const int BTN_PINS[BTN_COUNT] = {18,19,20,21};
 
+//OTHER CONSTANTS
+const int SCORE_MIN = 0;
+const int SCORE_MAX = 19;
+const int SCORE_TO_WIN = 10;
+const int RESET_DELAY = 1000;
+
 
 // GLOBAL OBJECTS
 SingleSevSeg scoreboard[2] = {SingleSevSeg(COMMON_CATHODE, DISP1_PINS),SingleSevSeg(COMMON_CATHODE, DISP2_PINS)};
 int scores[2] = {0, 0};
 int winner = -1;
+int resetCount = 0;
 
 
 // DEBOUNCE VARS
@@ -43,50 +50,69 @@ void setup() {
     lastButtonState[i] = LOW;
   }
 
-  scoreboard[0].winner();
-  scoreboard[1].winner();
+  animate();
 }
 
 void loop() {
-  for(int i=0; i<BTN_COUNT; i++) {
-    if(debounce(i)) {
-      btn_press(i);
+  //Check for the reset button combination
+  //If a pair of buttons is held down for a certain number of loops, reset the game
+  boolean cont = true;
+  for(int i=0; i<1; i+=2) {
+    //If a pair of buttons is held at the same time, increment the reset counter
+    if(digitalRead(BTN_PINS[i]) == HIGH && digitalRead(BTN_PINS[i+1]) == HIGH) {
+      cont = false;
+      resetCount++;
+      
+      //Wait for the reset delay
+      delay(RESET_DELAY/100);
+
+      //Check multiple times for release
+      if(resetCount == RESET_DELAY/10) {
+        //Reset the game
+        animate();
+        resetCount = 0;
+        new_game();
+      }
     }
   }
 
-  scoreboard[0].display(scores[0]);
-  scoreboard[1].display(scores[1]);
+  //Only continue through the loop if the reset button was not pressed
+  if(cont) {
+    resetCount = 0;
+    //Check for a single button press
+    for(int i=0; i<BTN_COUNT; i++) 
+    {
+      if(debounce(i)) 
+      {
+        btn_press(i);
+      }
+    }
 
-  if(winner != -1)
-  {
-    scoreboard[winner].winner();
-    new_game();
+    //Update the boards with current scores
+    scoreboard[0].display(scores[0]);
+    scoreboard[1].display(scores[1]);
+
+    //Check for a winner
+    if(winner != -1)
+    {
+      scoreboard[winner].winner();
+      new_game();
+    }
   }
 }
 
-void win(int player)
-{
-  winner = player;
-}
 void p1_goal()
 {
-  goal(0);
+  goal_adjust(0, 1);
 }
 
 void p2_goal()
 {
-  goal(1);
+  goal_adjust(1, 1);
 }
 
-void goal(int player)
-{
-  scores[player]++;
-  if(scores[player] >= 10)
-  {
-    win(player);
-  }
-}
-
+//Handles all single button presses
+//In this case, buttons just adjust scores for the players
 void btn_press(int btnNum)
 {
   switch(btnNum) {
@@ -107,19 +133,33 @@ void btn_press(int btnNum)
 
 void goal_adjust(int player, int amt)
 {
-  scores[player] += amt;
+   scores[player] += amt;
+
+   //Check for acceptable score limits
+   scores[player] = fmax(scores[player], SCORE_MIN);
+   scores[player] = fmin(scores[player], SCORE_MAX);
+
+  //Check for win condition
+  if(scores[player] >= SCORE_TO_WIN) {
+    winner = player;
+  }
+}
+
+void animate()
+{
+  scoreboard[0].winner();
+  scoreboard[1].winner();
 }
 
 void new_game()
 {
-  Serial.println("Reset");
   scores[0] = 0;
   scores[1] = 0;
   winner = -1;
 }
 
-bool debounce(int btnNum) {
-
+bool debounce(int btnNum) 
+{
   // read the state of the switch into a local variable:
   int reading = digitalRead(BTN_PINS[btnNum]);
 
