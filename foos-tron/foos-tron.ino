@@ -11,13 +11,19 @@ const int GOAL2_PIN = 3;
 
 // BUTTON PINS
 const int BTN_COUNT = 4;
-const int BTN_PINS[BTN_COUNT] = {18,19,20,21};
+const int BTN_PINS[BTN_COUNT] = {18,19,11,10};
 
 //OTHER CONSTANTS
 const int SCORE_MIN = 0;
 const int SCORE_MAX = 19;
 const int SCORE_TO_WIN = 10;
 const int RESET_DELAY = 1000;
+
+//LEDs
+const int LED_COUNT = 2;
+const int LED_PINS[LED_COUNT] = {6,7};
+const int LED_BRIGHTNESS_PLAY = 25;
+const int LED_BRIGHTNESS_MAX = 125;
 
 
 // GLOBAL OBJECTS
@@ -50,14 +56,26 @@ void setup() {
     lastButtonState[i] = LOW;
   }
 
-  animate();
+  //LEDs
+  pinMode(LED_PINS[0], OUTPUT);
+  pinMode(LED_PINS[1], OUTPUT);
+
+//  animate();
+  led_fade(0,LED_BRIGHTNESS_MAX);
+  led_fade(LED_BRIGHTNESS_MAX,LED_BRIGHTNESS_PLAY);
 }
 
 void loop() {
+  //Ensure LEDs are at right level
+  for(int j=0; j<LED_COUNT; j++)
+  {
+    analogWrite(LED_PINS[j], LED_BRIGHTNESS_PLAY);
+  }
+  
   //Check for the reset button combination
   //If a pair of buttons is held down for a certain number of loops, reset the game
   boolean cont = true;
-  for(int i=0; i<1; i+=2) {
+  for(int i=0; i<BTN_COUNT; i+=2) {
     //If a pair of buttons is held at the same time, increment the reset counter
     if(digitalRead(BTN_PINS[i]) == HIGH && digitalRead(BTN_PINS[i+1]) == HIGH) {
       cont = false;
@@ -95,8 +113,7 @@ void loop() {
     //Check for a winner
     if(winner != -1)
     {
-      scoreboard[winner].winner();
-      new_game();
+      win();
     }
   }
 }
@@ -104,11 +121,13 @@ void loop() {
 void p1_goal()
 {
   goal_adjust(0, 1);
+  led_goal(0);
 }
 
 void p2_goal()
 {
   goal_adjust(1, 1);
+  led_goal(1);
 }
 
 //Handles all single button presses
@@ -151,11 +170,131 @@ void animate()
   scoreboard[1].winner();
 }
 
+void win()
+{
+  //Make sure there's a winner
+  if(winner == -1)
+  {
+    //We shouldn't be here
+    return;
+  }
+  
+  //determine the loser
+  int loser = 0;
+  if(winner == 0)
+  {
+    loser = 1;
+  }
+  //Remove interrupts from sensors so more goals can't be scored
+  detachInterrupt(digitalPinToInterrupt(GOAL1_PIN));
+  detachInterrupt(digitalPinToInterrupt(GOAL2_PIN));
+
+  //Animate LEDs and scoreboard
+  led_player_set(LED_BRIGHTNESS_MAX, winner);
+  scoreboard[winner].winner();
+
+  //Update the boards with final scores
+  scoreboard[0].display(scores[0]);
+  scoreboard[1].display(scores[1]);
+  led_player_fade(LED_BRIGHTNESS_PLAY, 0, loser);
+
+  delay(5000);
+  
+  led_player_fade(LED_BRIGHTNESS_MAX, 0, winner);
+  new_game();
+}
+
 void new_game()
 {
+  //Remove interrupts from sensors so more goals can't be scored
+  detachInterrupt(digitalPinToInterrupt(GOAL1_PIN));
+  detachInterrupt(digitalPinToInterrupt(GOAL2_PIN));
+
+  //Reattach interrupts
+  attachInterrupt(digitalPinToInterrupt(GOAL1_PIN), p1_goal, FALLING);
+  attachInterrupt(digitalPinToInterrupt(GOAL2_PIN), p2_goal, FALLING);
+  
+  //Reset scores and turn LEDs on
   scores[0] = 0;
   scores[1] = 0;
   winner = -1;
+  led_fade(0,LED_BRIGHTNESS_PLAY);
+}
+
+void led_set(int r)
+{
+  for(int i=0; i<LED_COUNT; i++)
+  {
+    analogWrite(LED_PINS[i], r);
+  }
+}
+
+void led_player_set(int r, int player)
+{
+  analogWrite(LED_PINS[player], r);
+}
+
+void led_fade(int rStart, int rEnd)
+{
+  if(rStart < rEnd)
+  {
+    for(int i=rStart; i<=rEnd; i++)
+    {
+      for(int j=0; j<LED_COUNT; j++)
+      {
+        analogWrite(LED_PINS[j], i);
+      }
+      delay(15);
+    }
+  }
+  else
+  {
+    for(int i=rStart; i>=rEnd; i--)
+    {
+      for(int j=0; j<LED_COUNT; j++)
+      {
+        analogWrite(LED_PINS[j], i);
+      }
+      delay(20);
+    }
+  }
+}
+
+void led_player_fade(int rStart, int rEnd, int player)
+{
+  if(rStart < rEnd)
+  {
+    for(int i=rStart; i<=rEnd; i++)
+    {
+      analogWrite(LED_PINS[player], i);
+      delay(20);
+    }
+  }
+  else
+  {
+    for(int i=rStart; i>=rEnd; i--)
+    {
+      analogWrite(LED_PINS[player], i);
+      delay(20);
+    }
+  }
+}
+
+void led_goal(int player)
+{
+  for(int j=0; j<3; j++)
+  {
+    for(int i=LED_BRIGHTNESS_PLAY; i<LED_BRIGHTNESS_MAX; i++)
+    {
+      analogWrite(LED_PINS[player], i);
+      delay(2);
+    }
+    for(int i=LED_BRIGHTNESS_MAX; i>LED_BRIGHTNESS_PLAY; i--)
+    {
+      analogWrite(LED_PINS[player], i);
+      delay(2);
+    }
+  }
 }
 
 bool debounce(int btnNum) 

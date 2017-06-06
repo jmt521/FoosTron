@@ -24,7 +24,7 @@ class SingleSevSeg
     const int NUM_DIGITS = 38;
   
 
-    const bool SEGMENT_MAP[38][8]
+    const bool SEGMENT_MAP[40][8]
     {
       //Digits 1-9
       {1,1,1,1,1,1,0,0}, // zero
@@ -49,6 +49,8 @@ class SingleSevSeg
       {1,1,1,0,0,0,0,1}, // seventeen
       {1,1,1,1,1,1,1,1}, // eighteen
       {1,1,1,1,0,1,1,1}, // nineteen
+      {0,1,1,1,0,0,0,0}, // J (20)  - We want to show a J but ran out of numbers 
+      {0,1,1,1,0,0,0,0}, // off (21)
     };
 };
 
