@@ -11,9 +11,9 @@ void setup() {
   pinMode(ledpin, OUTPUT);      
   // initialize the sensor pin as an input:
   pinMode(sensor1pin, INPUT_PULLUP);       //set as input with pullup resistor
-  pinMode(sensor2pin, INPUT_PULLUP);
+//  pinMode(sensor2pin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(sensor1pin), count1, FALLING); //go to count 1 function when sensor1 goes from HIGH to LOW (beam broken)
-  attachInterrupt(digitalPinToInterrupt(sensor2pin), count2, FALLING);
+//  attachInterrupt(digitalPinToInterrupt(sensor2pin), count2, FALLING);
   
   Serial.begin(9600);
 }

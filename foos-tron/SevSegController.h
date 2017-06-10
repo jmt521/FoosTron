@@ -1,30 +1,32 @@
 #include "Arduino.h"
 
-#ifndef SingleSevSeg_h
-#define SingleSevSeg_h
+#ifndef SevSegController_h
+#define SevSegController_h
 
 #define COMMON_CATHODE	0
 #define COMMON_ANODE	1
 
-class SingleSevSeg
+class SevSegController
 {
   public:
-    SingleSevSeg(bool displayType, int* pinLayout);
-    void display(int digit);
-    void winner();
+    SevSegController(bool displayType, int pinLayout[][8]);
+    void displayAll(int digit);
+    void display(int digit, int dispNum);
+    void animateAll();
+    void animate(int dispNum);
 
   protected:
     bool displayType;
-    int* pinLayout;
+    int (*pinLayout)[8];
 
   private:
     const bool* getSegMap(int digit);
-
-    const int NUM_PINS = 8;
+    const static int NUM_PINS = 8;
     const int NUM_DIGITS = 38;
+    int num_displays;
   
 
-    const bool SEGMENT_MAP[40][8]
+    const bool SEGMENT_MAP[22][8]
     {
       //Digits 1-9
       {1,1,1,1,1,1,0,0}, // zero
@@ -49,8 +51,10 @@ class SingleSevSeg
       {1,1,1,0,0,0,0,1}, // seventeen
       {1,1,1,1,1,1,1,1}, // eighteen
       {1,1,1,1,0,1,1,1}, // nineteen
-      {0,1,1,1,0,0,0,0}, // J (20)  - We want to show a J but ran out of numbers 
-      {0,1,1,1,0,0,0,0}, // off (21)
+
+      //Other
+      {0,1,1,1,0,0,0,0}, // [20] - J
+      {0,0,0,0,0,0,0,0}, // [21] - off
     };
 };
 

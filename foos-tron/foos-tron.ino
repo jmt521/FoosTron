@@ -1,17 +1,16 @@
-#include "SingleSevSeg.h"
+#include "SevSegController.h"
 
 // PIN CONFIGURATIONS
 // DISPLAY PINS
-int DISP1_PINS[8] = {22,23,24,25,26,27,28,29};
-int DISP2_PINS[8] = {30,31,32,33,34,35,36,37};
+int DISP_PINS[2][8] = {{22,23,24,25,26,27,28,29},{30,31,32,33,34,35,36,37}};
 
 // GOAL PINS
-const int GOAL1_PIN = 2;
-const int GOAL2_PIN = 3;
+const int GOAL1_PIN = 3;
+const int GOAL2_PIN = 2;
 
 // BUTTON PINS
 const int BTN_COUNT = 4;
-const int BTN_PINS[BTN_COUNT] = {18,19,11,10};
+const int BTN_PINS[BTN_COUNT] = {18,19,10,11};
 
 //OTHER CONSTANTS
 const int SCORE_MIN = 0;
@@ -22,14 +21,14 @@ const int RESET_DELAY = 1000;
 //LEDs
 const int LED_COUNT = 2;
 const int LED_PINS[LED_COUNT] = {6,7};
-const int LED_BRIGHTNESS_PLAY = 25;
-const int LED_BRIGHTNESS_MAX = 125;
+const int LED_BRIGHTNESS_PLAY = 50;
+const int LED_BRIGHTNESS_MAX = 150;
 
 
 // GLOBAL OBJECTS
-SingleSevSeg scoreboard[2] = {SingleSevSeg(COMMON_CATHODE, DISP1_PINS),SingleSevSeg(COMMON_CATHODE, DISP2_PINS)};
-int scores[2] = {0, 0};
+SevSegController scoreboard = SevSegController(COMMON_CATHODE, DISP_PINS);
 int winner = -1;
+int scores[2] = {0, 0};
 int resetCount = 0;
 
 
@@ -41,13 +40,11 @@ int lastButtonState[BTN_COUNT];
  
 void setup() {
   // put your setup code here, to run once:
-  Serial.begin(9600); 
+//  Serial.begin(9600); 
 
+  //Goal sensors
   pinMode(GOAL1_PIN, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(GOAL1_PIN), p1_goal, FALLING);
-
   pinMode(GOAL2_PIN, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(GOAL2_PIN), p2_goal, FALLING);
 
   //Buttons and debounce
   for(int i=0; i<BTN_COUNT; i++) {
@@ -60,17 +57,33 @@ void setup() {
   pinMode(LED_PINS[0], OUTPUT);
   pinMode(LED_PINS[1], OUTPUT);
 
-//  animate();
+  //Startup animation
+  scoreboard.displayAll(20);
   led_fade(0,LED_BRIGHTNESS_MAX);
   led_fade(LED_BRIGHTNESS_MAX,LED_BRIGHTNESS_PLAY);
+  scoreboard.animateAll();
+  scoreboard.displayAll(0);
+
+  //Allow goals
+  attach_goal_interrupts();
 }
 
 void loop() {
+  //Check for a winner
+  if(winner != -1)
+  {
+    win();
+  }
+  
   //Ensure LEDs are at right level
   for(int j=0; j<LED_COUNT; j++)
   {
     analogWrite(LED_PINS[j], LED_BRIGHTNESS_PLAY);
   }
+
+  //Update the boards with current scores
+  scoreboard.display(scores[0], 0);
+  scoreboard.display(scores[1], 1);
   
   //Check for the reset button combination
   //If a pair of buttons is held down for a certain number of loops, reset the game
@@ -87,7 +100,7 @@ void loop() {
       //Check multiple times for release
       if(resetCount == RESET_DELAY/10) {
         //Reset the game
-        animate();
+        scoreboard.animateAll();
         resetCount = 0;
         new_game();
       }
@@ -105,29 +118,29 @@ void loop() {
         btn_press(i);
       }
     }
-
-    //Update the boards with current scores
-    scoreboard[0].display(scores[0]);
-    scoreboard[1].display(scores[1]);
-
-    //Check for a winner
-    if(winner != -1)
-    {
-      win();
-    }
   }
 }
 
 void p1_goal()
 {
-  goal_adjust(0, 1);
-  led_goal(0);
+  goal(0);
 }
 
 void p2_goal()
 {
-  goal_adjust(1, 1);
-  led_goal(1);
+  goal(1);
+}
+
+void goal(int player)
+{
+ boolean isWin = goal_adjust(player, 1);
+
+  if(!isWin)
+  {
+    //Light up the opposite goal
+    int goal = (player == 0) ? 1 : 0;
+    led_goal(goal); 
+  }
 }
 
 //Handles all single button presses
@@ -150,7 +163,7 @@ void btn_press(int btnNum)
   }
 }
 
-void goal_adjust(int player, int amt)
+boolean goal_adjust(int player, int amt)
 {
    scores[player] += amt;
 
@@ -161,23 +174,15 @@ void goal_adjust(int player, int amt)
   //Check for win condition
   if(scores[player] >= SCORE_TO_WIN) {
     winner = player;
+    return true;
   }
-}
-
-void animate()
-{
-  scoreboard[0].winner();
-  scoreboard[1].winner();
+  return false;
 }
 
 void win()
 {
-  //Make sure there's a winner
-  if(winner == -1)
-  {
-    //We shouldn't be here
-    return;
-  }
+  //Remove interrupts from sensors so more goals can't be scored
+  detach_goal_interrupts();
   
   //determine the loser
   int loser = 0;
@@ -185,17 +190,14 @@ void win()
   {
     loser = 1;
   }
-  //Remove interrupts from sensors so more goals can't be scored
-  detachInterrupt(digitalPinToInterrupt(GOAL1_PIN));
-  detachInterrupt(digitalPinToInterrupt(GOAL2_PIN));
-
+  
   //Animate LEDs and scoreboard
   led_player_set(LED_BRIGHTNESS_MAX, winner);
-  scoreboard[winner].winner();
+  scoreboard.animate(winner);
 
   //Update the boards with final scores
-  scoreboard[0].display(scores[0]);
-  scoreboard[1].display(scores[1]);
+  scoreboard.display(scores[0], 0);
+  scoreboard.display(scores[1], 1);
   led_player_fade(LED_BRIGHTNESS_PLAY, 0, loser);
 
   delay(5000);
@@ -207,12 +209,10 @@ void win()
 void new_game()
 {
   //Remove interrupts from sensors so more goals can't be scored
-  detachInterrupt(digitalPinToInterrupt(GOAL1_PIN));
-  detachInterrupt(digitalPinToInterrupt(GOAL2_PIN));
+  detach_goal_interrupts();
 
   //Reattach interrupts
-  attachInterrupt(digitalPinToInterrupt(GOAL1_PIN), p1_goal, FALLING);
-  attachInterrupt(digitalPinToInterrupt(GOAL2_PIN), p2_goal, FALLING);
+  attach_goal_interrupts();
   
   //Reset scores and turn LEDs on
   scores[0] = 0;
@@ -295,6 +295,18 @@ void led_goal(int player)
       delay(2);
     }
   }
+}
+
+void attach_goal_interrupts()
+{
+  attachInterrupt(digitalPinToInterrupt(GOAL1_PIN), p1_goal, FALLING);
+  attachInterrupt(digitalPinToInterrupt(GOAL2_PIN), p2_goal, FALLING);
+}
+
+void detach_goal_interrupts()
+{
+  detachInterrupt(digitalPinToInterrupt(GOAL1_PIN));
+  detachInterrupt(digitalPinToInterrupt(GOAL2_PIN));
 }
 
 bool debounce(int btnNum) 
