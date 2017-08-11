@@ -5,12 +5,12 @@
 int DISP_PINS[2][8] = {{22,23,24,25,26,27,28,29},{30,31,32,33,34,35,36,37}};
 
 // GOAL PINS
-const int GOAL1_PIN = 3;
-const int GOAL2_PIN = 2;
+const int GOAL1_PIN = 18;
+const int GOAL2_PIN = 19;
 
 // BUTTON PINS
 const int BTN_COUNT = 4;
-const int BTN_PINS[BTN_COUNT] = {18,19,10,11};
+const int BTN_PINS[BTN_COUNT] = {44,45,10,11};
 
 //OTHER CONSTANTS
 const int SCORE_MIN = 0;
