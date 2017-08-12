@@ -229,8 +229,10 @@ void win()
   //Update the boards with final scores
   scoreboard.display(scores[0], 0);
   scoreboard.display(scores[1], 1);
+
+  //Animate LEDs
   led_player_fade(LED_BRIGHTNESS_PLAY, 0, loser);
-  delay(5000);
+  delay(3000);
   led_player_fade(LED_BRIGHTNESS_MAX, 0, winner);
   led_fade(0,LED_BRIGHTNESS_DIM);
 

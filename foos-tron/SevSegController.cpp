@@ -24,24 +24,16 @@ void SevSegController::animateAll()
   {
     for(int i=0; i<NUM_PINS-2; i++)
     {
+      int out = (displayType == COMMON_CATHODE)? 1 : 0;
       for(int k=0; k<num_displays; k++)
       {
-        if(displayType == COMMON_CATHODE)
-        {
-          digitalWrite(pinLayout[k][i], 1);
-        } else {
-          digitalWrite(pinLayout[k][i], 0);
-        }
-        if(i>0)
-        {
-          if(displayType == COMMON_CATHODE)
-          {
-            digitalWrite(pinLayout[k][i-1], 0);
-          } else {
-            digitalWrite(pinLayout[k][i-1], 1);
-          }
-        }
-        delay(40);
+        digitalWrite(pinLayout[k][i], out);
+      }
+      delay(75);
+      out = (displayType == COMMON_CATHODE)? 0 : 1;
+      for(int k=0; k<num_displays; k++)
+      {
+        digitalWrite(pinLayout[k][i], out);
       }
     }
   }
