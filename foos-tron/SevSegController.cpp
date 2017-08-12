@@ -19,10 +19,10 @@ SevSegController::SevSegController(bool _displayType, int _pinLayout[][NUM_PINS]
 
 void SevSegController::animateAll()
 {
-  SevSegController::displayAll(0);
-  for(int j=0; j<4; j++)
+  SevSegController::displayAll(21);
+  for(int j=0; j<2; j++)
   {
-    for(int i=0; i<NUM_PINS-1; i++)
+    for(int i=0; i<NUM_PINS-2; i++)
     {
       for(int k=0; k<num_displays; k++)
       {
@@ -41,7 +41,7 @@ void SevSegController::animateAll()
             digitalWrite(pinLayout[k][i-1], 1);
           }
         }
-        delay(50);
+        delay(40);
       }
     }
   }
@@ -49,10 +49,10 @@ void SevSegController::animateAll()
 
 void SevSegController::animate(int dispNum)
 {
-  SevSegController::display(0, dispNum);
+  SevSegController::display(21, dispNum);
   for(int j=0; j<4; j++)
   {
-    for(int i=0; i<NUM_PINS-1; i++)
+    for(int i=0; i<NUM_PINS-2; i++)
     {
       if(displayType == COMMON_CATHODE)
       {

@@ -9,8 +9,9 @@ const int GOAL1_PIN = 18;
 const int GOAL2_PIN = 19;
 
 // BUTTON PINS
-const int BTN_COUNT = 4;
-const int BTN_PINS[BTN_COUNT] = {44,45,10,11};
+const int BTN_COUNT = 6;
+const int BTN_PINS[BTN_COUNT] = {44,45,10,11,46,47};
+const int BTN_LED_PINS[2] = {48,49};
 
 //OTHER CONSTANTS
 const int SCORE_MIN = 0;
@@ -21,6 +22,7 @@ const int RESET_DELAY = 1000;
 //LEDs
 const int LED_COUNT = 2;
 const int LED_PINS[LED_COUNT] = {6,7};
+const int LED_BRIGHTNESS_DIM = 10;
 const int LED_BRIGHTNESS_PLAY = 50;
 const int LED_BRIGHTNESS_MAX = 150;
 
@@ -30,7 +32,7 @@ SevSegController scoreboard = SevSegController(COMMON_CATHODE, DISP_PINS);
 int winner = -1;
 int scores[2] = {0, 0};
 int resetCount = 0;
-
+boolean goals_allowed = false;
 
 // DEBOUNCE VARS
 const unsigned long DEBOUNCE_DELAY = 50;
@@ -45,6 +47,8 @@ void setup() {
   //Goal sensors
   pinMode(GOAL1_PIN, INPUT_PULLUP);
   pinMode(GOAL2_PIN, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(GOAL1_PIN), p1_goal, FALLING);
+  attachInterrupt(digitalPinToInterrupt(GOAL2_PIN), p2_goal, FALLING);
 
   //Buttons and debounce
   for(int i=0; i<BTN_COUNT; i++) {
@@ -59,13 +63,13 @@ void setup() {
 
   //Startup animation
   scoreboard.displayAll(20);
-  led_fade(0,LED_BRIGHTNESS_MAX);
-  led_fade(LED_BRIGHTNESS_MAX,LED_BRIGHTNESS_PLAY);
-  scoreboard.animateAll();
-  scoreboard.displayAll(0);
+  led_fade(0,LED_BRIGHTNESS_DIM);
 
-  //Allow goals
-  attach_goal_interrupts();
+  //Wait for start buttons
+  const int btns[] = {4,5};
+  wait_for_press(btns,BTN_LED_PINS);
+
+  new_game();
 }
 
 void loop() {
@@ -100,7 +104,6 @@ void loop() {
       //Check multiple times for release
       if(resetCount == RESET_DELAY/10) {
         //Reset the game
-        scoreboard.animateAll();
         resetCount = 0;
         new_game();
       }
@@ -133,14 +136,17 @@ void p2_goal()
 
 void goal(int player)
 {
- boolean isWin = goal_adjust(player, 1);
-
-  if(!isWin)
-  {
-    //Light up the opposite goal
-    int goal = (player == 0) ? 1 : 0;
-    led_goal(goal); 
-  }
+ if(goals_allowed)
+ {
+   boolean isWin = goal_adjust(player, 1);
+  
+    if(!isWin)
+    {
+      //Light up the opposite goal
+      int goal = (player == 0) ? 1 : 0;
+      led_goal(goal); 
+    }
+ }
 }
 
 //Handles all single button presses
@@ -163,6 +169,31 @@ void btn_press(int btnNum)
   }
 }
 
+void wait_for_press(const int btnNums[], const int ledPins[])
+{
+  for(int i=0; i<2; i++) 
+  {
+    analogWrite(ledPins[i], 255);
+  }
+    
+  boolean cont = false;
+  while(!cont)
+  {
+    for(int i=0; i<2; i++) 
+    {
+      if(debounce(btnNums[i])) 
+      {
+        cont = true;
+      }
+    }
+  }
+
+  for(int i=0; i<2; i++) 
+  {
+    analogWrite(ledPins[i], 0);
+  }
+}
+
 boolean goal_adjust(int player, int amt)
 {
    scores[player] += amt;
@@ -182,7 +213,7 @@ boolean goal_adjust(int player, int amt)
 void win()
 {
   //Remove interrupts from sensors so more goals can't be scored
-  detach_goal_interrupts();
+  stop_goals();
   
   //determine the loser
   int loser = 0;
@@ -199,26 +230,36 @@ void win()
   scoreboard.display(scores[0], 0);
   scoreboard.display(scores[1], 1);
   led_player_fade(LED_BRIGHTNESS_PLAY, 0, loser);
-
   delay(5000);
-  
   led_player_fade(LED_BRIGHTNESS_MAX, 0, winner);
+  led_fade(0,LED_BRIGHTNESS_DIM);
+
+  //Wait for start buttons
+  const int btns[] = {4,5};
+  wait_for_press(btns,BTN_LED_PINS);
+  
   new_game();
 }
 
 void new_game()
 {
   //Remove interrupts from sensors so more goals can't be scored
-  detach_goal_interrupts();
+  stop_goals();
 
-  //Reattach interrupts
-  attach_goal_interrupts();
-  
+  //Animate
+  led_set(LED_BRIGHTNESS_MAX);
+  delay(500);
+  led_fade(LED_BRIGHTNESS_MAX,LED_BRIGHTNESS_PLAY);
+  scoreboard.animateAll();
+  scoreboard.displayAll(0);
+
   //Reset scores and turn LEDs on
   scores[0] = 0;
   scores[1] = 0;
   winner = -1;
-  led_fade(0,LED_BRIGHTNESS_PLAY);
+
+  //Reattach interrupts
+  allow_goals();
 }
 
 void led_set(int r)
@@ -297,16 +338,14 @@ void led_goal(int player)
   }
 }
 
-void attach_goal_interrupts()
+void allow_goals()
 {
-  attachInterrupt(digitalPinToInterrupt(GOAL1_PIN), p1_goal, FALLING);
-  attachInterrupt(digitalPinToInterrupt(GOAL2_PIN), p2_goal, FALLING);
+  goals_allowed = true;
 }
 
-void detach_goal_interrupts()
+void stop_goals()
 {
-  detachInterrupt(digitalPinToInterrupt(GOAL1_PIN));
-  detachInterrupt(digitalPinToInterrupt(GOAL2_PIN));
+  goals_allowed = false;
 }
 
 bool debounce(int btnNum) 
