@@ -17,6 +17,7 @@ const int BTN_LED_PINS[2] = {48,49};
 const int SCORE_MIN = 0;
 const int SCORE_MAX = 19;
 const int SCORE_TO_WIN = 10;
+const bool MULTIBALL = true;
 const int RESET_DELAY = 1000;
 
 //LEDs
@@ -33,6 +34,9 @@ int winner = -1;
 int scores[2] = {0, 0};
 int resetCount = 0;
 boolean goals_allowed = false;
+int num_balls = 1;
+boolean is_tiebreak = false;
+int tiebreak_total = -1;
 
 // DEBOUNCE VARS
 const unsigned long DEBOUNCE_DELAY = 50;
@@ -66,8 +70,10 @@ void setup() {
   led_fade(0,LED_BRIGHTNESS_DIM);
 
   //Wait for start buttons
-  const int btns[] = {4,5};
+  int btns[] = {4,5};
   wait_for_press(btns,BTN_LED_PINS);
+
+  set_num_balls();
 
   new_game();
 }
@@ -105,6 +111,7 @@ void loop() {
       if(resetCount == RESET_DELAY/10) {
         //Reset the game
         resetCount = 0;
+        set_num_balls();
         new_game();
       }
     }
@@ -169,6 +176,42 @@ void btn_press(int btnNum)
   }
 }
 
+void set_num_balls()
+{
+  bool cont = false;
+  while(!cont)
+  {
+    scoreboard.displayAll(num_balls);
+    
+    //Check for a single button press
+    for(int i=0; i<BTN_COUNT-2; i++) 
+    {
+      if(debounce(i)) 
+      {
+        switch(i) {
+          case 0:
+          case 2:
+            num_balls++;
+            break;
+          case 1:
+          case 3:
+            num_balls--;
+            break;
+        }
+      }
+    }
+
+    //Check for enter button
+    for(int i=4; i<6; i++) 
+    {
+      if(debounce(i)) 
+      {
+        cont = true;
+      }
+    }
+  }
+}
+
 void wait_for_press(const int btnNums[], const int ledPins[])
 {
   for(int i=0; i<2; i++) 
@@ -196,18 +239,86 @@ void wait_for_press(const int btnNums[], const int ledPins[])
 
 boolean goal_adjust(int player, int amt)
 {
-   scores[player] += amt;
+  //Determine other player
+  int other = (player == 0)? 1 : 0;
 
-   //Check for acceptable score limits
-   scores[player] = fmax(scores[player], SCORE_MIN);
-   scores[player] = fmin(scores[player], SCORE_MAX);
+  //Adjust the score
+  scores[player] += amt;
+  
+  //Check for acceptable score limits
+  scores[player] = fmax(scores[player], SCORE_MIN);
+  scores[player] = fmin(scores[player], SCORE_MAX);
 
-  //Check for win condition
-  if(scores[player] >= SCORE_TO_WIN) {
-    winner = player;
-    return true;
+  //Check for multi-ball scoring
+  if(MULTIBALL && num_balls > 1)
+  {
+    if(is_tiebreak)
+    {
+      if(scores[player] + scores[other] == tiebreak_total)
+      {
+        if(scores[player] > scores[other])
+        {
+          winner = player;
+          return true;
+        }
+        else if(scores[other] > scores[player])
+        {
+          winner = other;
+          return true;
+        }
+      }
+    }
+    if((scores[player] + scores[other]) % num_balls == 0)
+    {
+      if(scores[player] >= SCORE_TO_WIN && scores[player] > scores[other])
+      {
+        //Last to score wins if they are ahead
+        winner = player;
+        return true;
+      }
+      else if(scores[other] >= SCORE_TO_WIN && (scores[other] - scores[player]) >= num_balls)
+      {
+        //If other is ahead by more than the number of balls, they win
+        winner = other;
+        return true;
+      }
+      else if((scores[player] >= SCORE_TO_WIN || scores[other] >= SCORE_TO_WIN) 
+                  && abs(scores[player]-scores[other]) < num_balls)
+      {
+        //If score is within number of balls, go to tiebreaker
+        //Show the number of balls for tiebreaker, 1 more than score difference
+        int diff = abs(scores[player]-scores[other]) + 1;
+        is_tiebreak = true;
+        tiebreak_total = scores[player] + scores[other] + diff;
+
+        //Show tiebreak number
+        for(int i=0; i<3; i++)
+        {
+          led_set(LED_BRIGHTNESS_MAX);
+          scoreboard.displayAll(diff);
+          delay(500);
+          led_set(LED_BRIGHTNESS_PLAY);
+          scoreboard.displayAll(21);
+          delay(500);
+        }
+        scoreboard.displayAll(diff);
+        //Wait for start buttons
+        int btns[] = {4,5};
+        wait_for_press(btns,BTN_LED_PINS);
+      }
+    }
+    return false;
   }
-  return false;
+  //Normal scoring
+  else
+  {
+    //Check for win condition
+    if(scores[player] >= SCORE_TO_WIN) {
+      winner = player;
+      return true;
+    }
+    return false; 
+  }
 }
 
 void win()
@@ -259,6 +370,8 @@ void new_game()
   scores[0] = 0;
   scores[1] = 0;
   winner = -1;
+  is_tiebreak = false;
+  tiebreak_total = -1;
 
   //Reattach interrupts
   allow_goals();
