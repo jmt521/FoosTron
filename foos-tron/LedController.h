@@ -6,11 +6,15 @@
 class LedController
 {
   public:
-    LedController(int pinLayout[][3]);
-    void set(int level, int group);
+    LedController(int pins[]);
+    void set(int level, int index);
     void setAll(int level);
-    void fade(int start, int end, int group);
+    void fade(int start, int end, int index);
     void fadeAll(int start, int end);
+    void flash(int index, int duration, int rStart, int rEnd);
+  private:
+    int (*pins);
+    int led_count;
   
 };
 
