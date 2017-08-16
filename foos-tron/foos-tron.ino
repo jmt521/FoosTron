@@ -1,45 +1,24 @@
 #include "SevSegController.h"
+#include "LedController.h"
+#include "FoosConfig.h"
 
-// PIN CONFIGURATIONS
-// DISPLAY PINS
-int DISP_PINS[2][8] = {{22,23,24,25,26,27,28,29},{30,31,32,33,34,35,36,37}};
-
-// GOAL PINS
-const int GOAL1_PIN = 18;
-const int GOAL2_PIN = 19;
-
-// BUTTON PINS
-const int BTN_COUNT = 6;
-const int BTN_PINS[BTN_COUNT] = {44,45,10,11,46,47};
-const int BTN_LED_PINS[2] = {48,49};
-
-//OTHER CONSTANTS
-const int SCORE_MIN = 0;
-const int SCORE_MAX = 19;
-const int SCORE_TO_WIN = 10;
-const bool MULTIBALL = true;
-const int RESET_DELAY = 1000;
-
-//LEDs
-const int LED_COUNT = 2;
-const int LED_PINS[LED_COUNT] = {6,7};
-const int LED_BRIGHTNESS_DIM = 10;
-const int LED_BRIGHTNESS_PLAY = 50;
-const int LED_BRIGHTNESS_MAX = 150;
-
-
-// GLOBAL OBJECTS
+//CONTROLLERS
 SevSegController scoreboard = SevSegController(COMMON_CATHODE, DISP_PINS);
+LedController leds = LedController(LED_PINS);
+LedController btnLeds = LedController(BTN_LED_PINS);
+
+//GAME STATE GLOBALS
 int winner = -1;
 int scores[2] = {0, 0};
 int resetCount = 0;
 boolean goals_allowed = false;
 int num_balls = 1;
 boolean is_tiebreak = false;
+boolean show_tiebreak = false;
 int tiebreak_total = -1;
+int tiebreak_diff = -1;
 
 // DEBOUNCE VARS
-const unsigned long DEBOUNCE_DELAY = 50;
 unsigned long lastDebounceTime[BTN_COUNT];
 int buttonState[BTN_COUNT];
 int lastButtonState[BTN_COUNT];
@@ -67,14 +46,14 @@ void setup() {
 
   //Startup animation
   scoreboard.displayAll(20);
-  led_fade(0,LED_BRIGHTNESS_DIM);
+  leds.fadeAll(0,LED_BRIGHTNESS_DIM);
 
   //Wait for start buttons
   int btns[] = {4,5};
   wait_for_press(btns,BTN_LED_PINS);
 
+  //Select number of balls and start the game
   set_num_balls();
-
   new_game();
 }
 
@@ -83,6 +62,13 @@ void loop() {
   if(winner != -1)
   {
     win();
+  }
+
+  //Check for tiebreak
+  if(show_tiebreak)
+  {
+    tiebreak();
+    show_tiebreak = false;
   }
   
   //Ensure LEDs are at right level
@@ -151,7 +137,7 @@ void goal(int player)
     {
       //Light up the opposite goal
       int goal = (player == 0) ? 1 : 0;
-      led_goal(goal); 
+      leds.flash(goal, 3, LED_BRIGHTNESS_PLAY, LED_BRIGHTNESS_MAX); 
     }
  }
 }
@@ -179,9 +165,20 @@ void btn_press(int btnNum)
 void set_num_balls()
 {
   bool cont = false;
+  int blinkCount = 2000;
+  int displayOn = true;
   while(!cont)
   {
-    scoreboard.displayAll(num_balls);
+    if(displayOn)
+    {
+      scoreboard.displayAll(num_balls);
+      btnLeds.setAll(255);
+    }
+    else
+    {
+      scoreboard.displayAll(21);
+      btnLeds.setAll(0);
+    }
     
     //Check for a single button press
     for(int i=0; i<BTN_COUNT-2; i++) 
@@ -201,12 +198,35 @@ void set_num_balls()
       }
     }
 
+    //Keep number within defined limits
+    num_balls = fmax(num_balls, BALLS_MIN);
+    num_balls = fmin(num_balls, BALLS_MAX);
+
     //Check for enter button
     for(int i=4; i<6; i++) 
     {
       if(debounce(i)) 
       {
         cont = true;
+        leds.setAll(LED_BRIGHTNESS_DIM);
+        btnLeds.setAll(0);
+        scoreboard.displayAll(21);
+      }
+    }
+
+    //Manage blink timing
+    blinkCount--;
+    if(blinkCount == 0)
+    {
+      if(displayOn)
+      {
+        displayOn = false;
+        blinkCount = 1000;
+      }
+      else
+      {
+        displayOn = true;
+        blinkCount = 2000;
       }
     }
   }
@@ -214,10 +234,7 @@ void set_num_balls()
 
 void wait_for_press(const int btnNums[], const int ledPins[])
 {
-  for(int i=0; i<2; i++) 
-  {
-    analogWrite(ledPins[i], 255);
-  }
+  btnLeds.setAll(255);
     
   boolean cont = false;
   while(!cont)
@@ -231,10 +248,7 @@ void wait_for_press(const int btnNums[], const int ledPins[])
     }
   }
 
-  for(int i=0; i<2; i++) 
-  {
-    analogWrite(ledPins[i], 0);
-  }
+  btnLeds.setAll(0);
 }
 
 boolean goal_adjust(int player, int amt)
@@ -287,24 +301,11 @@ boolean goal_adjust(int player, int amt)
       {
         //If score is within number of balls, go to tiebreaker
         //Show the number of balls for tiebreaker, 1 more than score difference
-        int diff = abs(scores[player]-scores[other]) + 1;
+        stop_goals();
         is_tiebreak = true;
-        tiebreak_total = scores[player] + scores[other] + diff;
-
-        //Show tiebreak number
-        for(int i=0; i<3; i++)
-        {
-          led_set(LED_BRIGHTNESS_MAX);
-          scoreboard.displayAll(diff);
-          delay(500);
-          led_set(LED_BRIGHTNESS_PLAY);
-          scoreboard.displayAll(21);
-          delay(500);
-        }
-        scoreboard.displayAll(diff);
-        //Wait for start buttons
-        int btns[] = {4,5};
-        wait_for_press(btns,BTN_LED_PINS);
+        show_tiebreak = true;
+        tiebreak_diff = abs(scores[player]-scores[other]) + 1;
+        tiebreak_total = scores[player] + scores[other] + tiebreak_diff;
       }
     }
     return false;
@@ -321,6 +322,24 @@ boolean goal_adjust(int player, int amt)
   }
 }
 
+void tiebreak()
+{
+  //Show tiebreak number
+  for(int i=0; i<3; i++)
+  {
+    leds.setAll(LED_BRIGHTNESS_MAX);
+    scoreboard.displayAll(tiebreak_diff);
+    delay(500);
+    leds.setAll(LED_BRIGHTNESS_PLAY);
+    scoreboard.displayAll(21);
+    delay(500);
+  }
+  scoreboard.displayAll(tiebreak_diff);
+  //Wait for start buttons
+  wait_for_press(START_BTNS, BTN_LED_PINS);
+  allow_goals();
+}
+
 void win()
 {
   //Remove interrupts from sensors so more goals can't be scored
@@ -334,7 +353,7 @@ void win()
   }
   
   //Animate LEDs and scoreboard
-  led_player_set(LED_BRIGHTNESS_MAX, winner);
+  leds.set(LED_BRIGHTNESS_MAX, winner);
   scoreboard.animate(winner);
 
   //Update the boards with final scores
@@ -342,10 +361,10 @@ void win()
   scoreboard.display(scores[1], 1);
 
   //Animate LEDs
-  led_player_fade(LED_BRIGHTNESS_PLAY, 0, loser);
+  leds.fade(LED_BRIGHTNESS_PLAY, 0, loser);
   delay(3000);
-  led_player_fade(LED_BRIGHTNESS_MAX, 0, winner);
-  led_fade(0,LED_BRIGHTNESS_DIM);
+  leds.fade(LED_BRIGHTNESS_MAX, 0, winner);
+  leds.fadeAll(0,LED_BRIGHTNESS_DIM);
 
   //Wait for start buttons
   const int btns[] = {4,5};
@@ -358,11 +377,12 @@ void new_game()
 {
   //Remove interrupts from sensors so more goals can't be scored
   stop_goals();
+  scoreboard.displayAll(21);
 
   //Animate
-  led_set(LED_BRIGHTNESS_MAX);
+  leds.setAll(LED_BRIGHTNESS_MAX);
   delay(500);
-  led_fade(LED_BRIGHTNESS_MAX,LED_BRIGHTNESS_PLAY);
+  leds.fadeAll(LED_BRIGHTNESS_MAX,LED_BRIGHTNESS_PLAY);
   scoreboard.animateAll();
   scoreboard.displayAll(0);
 
@@ -371,86 +391,12 @@ void new_game()
   scores[1] = 0;
   winner = -1;
   is_tiebreak = false;
+  show_tiebreak = false;
   tiebreak_total = -1;
+  tiebreak_diff = -1;
 
   //Reattach interrupts
   allow_goals();
-}
-
-void led_set(int r)
-{
-  for(int i=0; i<LED_COUNT; i++)
-  {
-    analogWrite(LED_PINS[i], r);
-  }
-}
-
-void led_player_set(int r, int player)
-{
-  analogWrite(LED_PINS[player], r);
-}
-
-void led_fade(int rStart, int rEnd)
-{
-  if(rStart < rEnd)
-  {
-    for(int i=rStart; i<=rEnd; i++)
-    {
-      for(int j=0; j<LED_COUNT; j++)
-      {
-        analogWrite(LED_PINS[j], i);
-      }
-      delay(15);
-    }
-  }
-  else
-  {
-    for(int i=rStart; i>=rEnd; i--)
-    {
-      for(int j=0; j<LED_COUNT; j++)
-      {
-        analogWrite(LED_PINS[j], i);
-      }
-      delay(20);
-    }
-  }
-}
-
-void led_player_fade(int rStart, int rEnd, int player)
-{
-  if(rStart < rEnd)
-  {
-    for(int i=rStart; i<=rEnd; i++)
-    {
-      analogWrite(LED_PINS[player], i);
-      delay(20);
-    }
-  }
-  else
-  {
-    for(int i=rStart; i>=rEnd; i--)
-    {
-      analogWrite(LED_PINS[player], i);
-      delay(20);
-    }
-  }
-}
-
-void led_goal(int player)
-{
-  for(int j=0; j<3; j++)
-  {
-    for(int i=LED_BRIGHTNESS_PLAY; i<LED_BRIGHTNESS_MAX; i++)
-    {
-      analogWrite(LED_PINS[player], i);
-      delay(2);
-    }
-    for(int i=LED_BRIGHTNESS_MAX; i>LED_BRIGHTNESS_PLAY; i--)
-    {
-      analogWrite(LED_PINS[player], i);
-      delay(2);
-    }
-  }
 }
 
 void allow_goals()
@@ -478,7 +424,7 @@ bool debounce(int btnNum)
     lastDebounceTime[btnNum] = millis();
   }
 
-  if ((millis() - lastDebounceTime[btnNum]) > DEBOUNCE_DELAY) {
+  if ((millis() - lastDebounceTime[btnNum]) > BTN_DEBOUNCE_DELAY) {
     // whatever the reading is at, it's been there for longer
     // than the debounce delay, so take it as the actual current state:
 
