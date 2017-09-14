@@ -1,6 +1,7 @@
 #include "SevSegController.h"
 #include "LedController.h"
 #include "FoosConfig.h"
+#include <ArduinoJson.h>
 
 //CONTROLLERS
 SevSegController scoreboard = SevSegController(COMMON_CATHODE, DISP_PINS);
@@ -25,7 +26,7 @@ int lastButtonState[BTN_COUNT];
  
 void setup() {
   // put your setup code here, to run once:
-//  Serial.begin(9600); 
+  Serial.begin(9600); 
 
   //Goal sensors
   pinMode(GOAL1_PIN, INPUT_PULLUP);
@@ -132,7 +133,8 @@ void goal(int player)
  if(goals_allowed)
  {
    boolean isWin = goal_adjust(player, 1);
-  
+   send_event("goal");
+   
     if(!isWin)
     {
       //Light up the opposite goal
@@ -344,6 +346,8 @@ void win()
 {
   //Remove interrupts from sensors so more goals can't be scored
   stop_goals();
+
+  send_event("win");
   
   //determine the loser
   int loser = 0;
@@ -395,6 +399,9 @@ void new_game()
   tiebreak_total = -1;
   tiebreak_diff = -1;
 
+  //Update clients
+  send_event("start");
+  
   //Reattach interrupts
   allow_goals();
 }
@@ -407,6 +414,20 @@ void allow_goals()
 void stop_goals()
 {
   goals_allowed = false;
+}
+
+void send_event(String type)
+{
+  StaticJsonBuffer<200> jsonBuffer;
+  JsonObject& root = jsonBuffer.createObject();
+  root["event"] = type;
+
+  JsonArray& score_msg = root.createNestedArray("score");
+  score_msg.add(scores[0]);
+  score_msg.add(scores[1]);
+  
+  root.printTo(Serial);
+  Serial.flush ();
 }
 
 bool debounce(int btnNum) 
