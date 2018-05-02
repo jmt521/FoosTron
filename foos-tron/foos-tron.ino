@@ -20,6 +20,7 @@ int tiebreak_total = -1;
 int tiebreak_diff = -1;
 
 // DEBOUNCE VARS
+unsigned long lastGoal[2] = {0, 0};
 unsigned long lastDebounceTime[BTN_COUNT];
 int buttonState[BTN_COUNT];
 int lastButtonState[BTN_COUNT];
@@ -130,8 +131,11 @@ void p2_goal()
 
 void goal(int player)
 {
- if(goals_allowed)
+ unsigned long curTime = millis();
+ 
+ if(goals_allowed && curTime - lastGoal[player] > GOAL_DEBOUNCE_DELAY)
  {
+   lastGoal[player] = curTime;
    boolean isWin = goal_adjust(player, 1);
    send_event("goal");
    
@@ -151,84 +155,91 @@ void btn_press(int btnNum)
   switch(btnNum) {
     case 0:
       goal_adjust(0, 1);
+      send_event("adjust");
       break;
     case 1:
       goal_adjust(0, -1);
+      send_event("adjust");
       break;
     case 2: 
       goal_adjust(1, 1);
+      send_event("adjust");
       break;
     case 3:
       goal_adjust(1, -1);
+      send_event("adjust");
       break;
   }
 }
 
 void set_num_balls()
 {
-  bool cont = false;
-  int blinkCount = 2000;
-  int displayOn = true;
-  while(!cont)
+  if(MULTIBALL)
   {
-    if(displayOn)
-    {
-      scoreboard.displayAll(num_balls);
-      btnLeds.setAll(255);
-    }
-    else
-    {
-      scoreboard.displayAll(21);
-      btnLeds.setAll(0);
-    }
-    
-    //Check for a single button press
-    for(int i=0; i<BTN_COUNT-2; i++) 
-    {
-      if(debounce(i)) 
-      {
-        switch(i) {
-          case 0:
-          case 2:
-            num_balls++;
-            break;
-          case 1:
-          case 3:
-            num_balls--;
-            break;
-        }
-      }
-    }
-
-    //Keep number within defined limits
-    num_balls = fmax(num_balls, BALLS_MIN);
-    num_balls = fmin(num_balls, BALLS_MAX);
-
-    //Check for enter button
-    for(int i=4; i<6; i++) 
-    {
-      if(debounce(i)) 
-      {
-        cont = true;
-        leds.setAll(LED_BRIGHTNESS_DIM);
-        btnLeds.setAll(0);
-        scoreboard.displayAll(21);
-      }
-    }
-
-    //Manage blink timing
-    blinkCount--;
-    if(blinkCount == 0)
+    bool cont = false;
+    int blinkCount = 2000;
+    int displayOn = true;
+    while(!cont)
     {
       if(displayOn)
       {
-        displayOn = false;
-        blinkCount = 1000;
+        scoreboard.displayAll(num_balls);
+        btnLeds.setAll(255);
       }
       else
       {
-        displayOn = true;
-        blinkCount = 2000;
+        scoreboard.displayAll(21);
+        btnLeds.setAll(0);
+      }
+      
+      //Check for a single button press
+      for(int i=0; i<BTN_COUNT-2; i++) 
+      {
+        if(debounce(i)) 
+        {
+          switch(i) {
+            case 0:
+            case 2:
+              num_balls++;
+              break;
+            case 1:
+            case 3:
+              num_balls--;
+              break;
+          }
+        }
+      }
+  
+      //Keep number within defined limits
+      num_balls = fmax(num_balls, BALLS_MIN);
+      num_balls = fmin(num_balls, BALLS_MAX);
+  
+      //Check for enter button
+      for(int i=4; i<6; i++) 
+      {
+        if(debounce(i)) 
+        {
+          cont = true;
+          leds.setAll(LED_BRIGHTNESS_DIM);
+          btnLeds.setAll(0);
+          scoreboard.displayAll(21);
+        }
+      }
+  
+      //Manage blink timing
+      blinkCount--;
+      if(blinkCount == 0)
+      {
+        if(displayOn)
+        {
+          displayOn = false;
+          blinkCount = 1000;
+        }
+        else
+        {
+          displayOn = true;
+          blinkCount = 2000;
+        }
       }
     }
   }

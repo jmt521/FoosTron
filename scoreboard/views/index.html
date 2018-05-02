@@ -1,0 +1,89 @@
+<html>
+<head>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://unpkg.com/vue@2.5.11/dist/vue.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/spectre.css/dist/spectre.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/spectre.css/dist/spectre-icons.min.css">    
+    <style>
+        .empty, .columns {
+            height: 100vh;
+        }
+    </style>
+    <script>
+        var socket = io();
+        socket.on('event', function(msg) {
+            console.log(msg);
+            bus.$emit(msg.event, msg);
+            bus.$emit('update', msg.state);
+        })
+        
+        var bus = new Vue();
+        var app;
+        
+        document.addEventListener("DOMContentLoaded", function(){
+            app = new Vue({
+                el: "#app",
+                data: {
+                    connected: false,
+                    state: {
+                        serial: {
+                            connected: false,
+                            connecting: false
+                        },
+                        game: {
+                            active: false,
+                            score: [0, 0],
+                            startTime: undefined,
+                            endTime: undefined
+                        }
+                    }
+                },
+                methods: {
+                    updateScore: function(score) {
+                        this.score = score;
+                    },
+                    connect: function() {
+                        console.log("connecting...");
+                        socket.send("connect");
+                        this.state.serial.connecting = true;
+                    },
+                    updateState: function(state) {
+                        this.state = state;
+                    }
+                },
+                created: function() {
+                    bus.$on('update', (function(state) {
+                        this.updateState(state);
+                    }).bind(this));
+                }
+            })
+        });
+        
+    </script>
+</head>
+<body>
+    <div id="app">
+        <div v-if="!state.serial.connected" class="empty col-12">
+            <div class="empty-icon">
+                <i v-if="!state.serial.connecting" class="icon icon-4x icon-cross"></i>
+                <div v-else class="loading loading-lg"></div>
+            </div>
+            <p v-if="!state.serial.connecting" class="empty-title h3">Foos-tron offline</p>
+            <p v-else class="empty-title h3">Connecting...</p>
+            <div class="empty-action">
+                <button class="btn btn-lg btn-primary" :disabled="state.serial.connecting ? true : null" @click="connect()">Connect</button>
+            </div>
+        </div>
+
+        <div v-else id="scoreboard" class="columns">
+            <div class="col-6 col-sm-12 text-center">
+                <h1>{{state.game.score[0]}}</h1>
+            </div>
+            <div class="col-6 col-sm-12 text-center">
+                <h1>{{state.game.score[1]}}</h1>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+

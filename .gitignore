@@ -2,3 +2,5 @@
 \.vscode/settings\.json
 
 client/node_modules/
+
+scoreboard/node_modules/
