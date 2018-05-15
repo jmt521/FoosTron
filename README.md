@@ -18,3 +18,8 @@
 * Node, Express, and Socket.IO
 * Receives data from Arduino over serial port and sends to client via web socket
 
+## Examples
+![pic](https://raw.githubusercontent.com/jmt521/FoosTron/master/doc/foostron.jpg)
+![goal1](https://raw.githubusercontent.com/jmt521/FoosTron/master/doc/goal1.gif)
+![goal2](https://raw.githubusercontent.com/jmt521/FoosTron/master/doc/goal2.gif)
+
